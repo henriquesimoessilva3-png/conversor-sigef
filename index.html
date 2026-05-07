@@ -89,12 +89,109 @@
     font-weight: 500;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 10px;
-    margin-top: 16px;
     transition: all 0.15s;
+    width: 100%;
   }
   .auth-card .signin-btn:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
   .auth-card .signin-btn img { width: 20px; height: 20px; }
+  .auth-tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid #e5e5ea;
+    margin: 18px 0 16px;
+  }
+  .auth-tabs button {
+    flex: 1;
+    background: none;
+    border: none;
+    padding: 10px 0;
+    font-size: 14px;
+    color: #666;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .auth-tabs button.active {
+    color: #1d3557;
+    font-weight: 600;
+    border-bottom-color: #1d3557;
+  }
+  .auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-align: left;
+  }
+  .auth-form label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: -6px;
+  }
+  .auth-form input {
+    padding: 10px 12px;
+    border: 1px solid #d2d2d7;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .auth-form input:focus { outline: none; border-color: #1d3557; }
+  .auth-form .submit-btn {
+    background: #1d3557;
+    color: white;
+    border: none;
+    padding: 11px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    margin-top: 6px;
+  }
+  .auth-form .submit-btn:hover { background: #2a4a73; }
+  .auth-form .submit-btn:disabled { background: #999; cursor: not-allowed; }
+  .auth-form .forgot-link {
+    background: none;
+    border: none;
+    color: #457b9d;
+    font-size: 12px;
+    cursor: pointer;
+    text-align: right;
+    padding: 0;
+    margin-top: -4px;
+  }
+  .auth-form .forgot-link:hover { text-decoration: underline; }
+  .auth-divider {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #999;
+    font-size: 12px;
+    margin: 14px 0;
+  }
+  .auth-divider::before, .auth-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: #e5e5ea;
+  }
+  .auth-error {
+    color: #c0392b;
+    font-size: 12px;
+    background: #fde8e6;
+    padding: 8px 10px;
+    border-radius: 4px;
+    text-align: left;
+  }
+  .auth-success {
+    color: #155724;
+    font-size: 12px;
+    background: #d4edda;
+    padding: 8px 10px;
+    border-radius: 4px;
+    text-align: left;
+  }
   .auth-card .pending-info {
     background: #fff3cd;
     color: #5d4d00;
@@ -341,13 +438,44 @@
 <div class="auth-screen" id="auth-screen">
   <div class="auth-card">
     <h1>Conversor SIGEF</h1>
-    <p>Faça login com sua conta Google para acessar a ferramenta.</p>
+    <p>Memorial Descritivo PDF → Word</p>
+
+    <div class="auth-tabs">
+      <button id="tab-login" class="active" type="button">Entrar</button>
+      <button id="tab-register" type="button">Criar conta</button>
+    </div>
+
+    <form class="auth-form" id="login-form">
+      <label for="login-email">Email</label>
+      <input type="email" id="login-email" autocomplete="email" required>
+      <label for="login-password">Senha</label>
+      <input type="password" id="login-password" autocomplete="current-password" required>
+      <button type="button" class="forgot-link" id="forgot-link">Esqueci minha senha</button>
+      <button type="submit" class="submit-btn" id="login-submit">Entrar</button>
+      <div class="auth-error hidden" id="login-error"></div>
+      <div class="auth-success hidden" id="login-success"></div>
+    </form>
+
+    <form class="auth-form hidden" id="register-form">
+      <label for="register-name">Nome completo</label>
+      <input type="text" id="register-name" autocomplete="name" required>
+      <label for="register-email">Email</label>
+      <input type="email" id="register-email" autocomplete="email" required>
+      <label for="register-password">Senha (mínimo 6 caracteres)</label>
+      <input type="password" id="register-password" autocomplete="new-password" minlength="6" required>
+      <button type="submit" class="submit-btn" id="register-submit">Cadastrar</button>
+      <div class="auth-error hidden" id="register-error"></div>
+    </form>
+
+    <div class="auth-divider">ou</div>
+
     <button class="signin-btn" id="signin-btn">
       <img src="https://www.google.com/favicon.ico" alt="">
-      Entrar com Google
+      Continuar com Google
     </button>
+
     <p style="font-size:11px; color:#999; margin-top:20px;">
-      Apenas usuários autorizados podem usar a ferramenta. Após o login, seu acesso ficará pendente até a aprovação do administrador.
+      Após o cadastro, seu acesso fica pendente até o administrador aprovar.
     </p>
   </div>
 </div>
@@ -440,7 +568,9 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
 import {
-  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
+  createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail,
+  updateProfile
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection,
@@ -1577,12 +1707,118 @@ $("clear-history-btn").addEventListener("click", async () => {
 });
 
 // ===== Bootstrap =====
+function authMessage(elId, type, txt) {
+  const el = $(elId);
+  el.textContent = txt;
+  el.className = "auth-" + type;
+  if (!txt) el.classList.add("hidden");
+  else el.classList.remove("hidden");
+}
+function clearAuthMessages() {
+  ["login-error","login-success","register-error"].forEach(id => {
+    $(id).className = "auth-error hidden";
+    $(id).textContent = "";
+  });
+}
+function authErrorMessage(err) {
+  const code = err?.code || "";
+  const map = {
+    "auth/invalid-email": "Email inválido.",
+    "auth/missing-password": "Digite sua senha.",
+    "auth/invalid-credential": "Email ou senha incorretos.",
+    "auth/wrong-password": "Senha incorreta.",
+    "auth/user-not-found": "Email não cadastrado.",
+    "auth/email-already-in-use": "Este email já tem cadastro. Use 'Entrar'.",
+    "auth/weak-password": "Senha fraca — use no mínimo 6 caracteres.",
+    "auth/too-many-requests": "Muitas tentativas. Tente novamente em alguns minutos.",
+    "auth/operation-not-allowed": "Login por email/senha não está habilitado no Firebase. Avise o administrador.",
+    "auth/popup-closed-by-user": "Login cancelado.",
+    "auth/popup-blocked": "O navegador bloqueou a janela de login. Permita popups e tente de novo."
+  };
+  return map[code] || (err?.message || "Erro desconhecido");
+}
+
+// Abas Entrar / Criar conta
+$("tab-login").addEventListener("click", () => {
+  $("tab-login").classList.add("active");
+  $("tab-register").classList.remove("active");
+  $("login-form").classList.remove("hidden");
+  $("register-form").classList.add("hidden");
+  clearAuthMessages();
+});
+$("tab-register").addEventListener("click", () => {
+  $("tab-register").classList.add("active");
+  $("tab-login").classList.remove("active");
+  $("register-form").classList.remove("hidden");
+  $("login-form").classList.add("hidden");
+  clearAuthMessages();
+});
+
+// Login com email/senha
+$("login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  clearAuthMessages();
+  const email = $("login-email").value.trim();
+  const pw = $("login-password").value;
+  const btn = $("login-submit");
+  btn.disabled = true; btn.textContent = "Entrando...";
+  try {
+    await signInWithEmailAndPassword(fbAuth, email, pw);
+  } catch (err) {
+    console.error("login:", err);
+    authMessage("login-error", "error", authErrorMessage(err));
+  } finally {
+    btn.disabled = false; btn.textContent = "Entrar";
+  }
+});
+
+// Cadastro com email/senha
+$("register-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  clearAuthMessages();
+  const name = $("register-name").value.trim();
+  const email = $("register-email").value.trim();
+  const pw = $("register-password").value;
+  const btn = $("register-submit");
+  btn.disabled = true; btn.textContent = "Cadastrando...";
+  try {
+    const cred = await createUserWithEmailAndPassword(fbAuth, email, pw);
+    if (name) {
+      try { await updateProfile(cred.user, { displayName: name }); } catch {}
+    }
+    // O onAuthStateChanged abaixo cria o doc do usuário e mostra a tela apropriada
+  } catch (err) {
+    console.error("register:", err);
+    authMessage("register-error", "error", authErrorMessage(err));
+  } finally {
+    btn.disabled = false; btn.textContent = "Cadastrar";
+  }
+});
+
+// Esqueci a senha
+$("forgot-link").addEventListener("click", async () => {
+  const email = $("login-email").value.trim();
+  if (!email) {
+    authMessage("login-error", "error", "Digite seu email no campo acima primeiro, depois clique em 'Esqueci minha senha'.");
+    return;
+  }
+  clearAuthMessages();
+  try {
+    await sendPasswordResetEmail(fbAuth, email);
+    authMessage("login-success", "success", `Enviamos um link de redefinição para ${email}. Cheque sua caixa de entrada (e o spam).`);
+  } catch (err) {
+    console.error("reset:", err);
+    authMessage("login-error", "error", authErrorMessage(err));
+  }
+});
+
 $("signin-btn").addEventListener("click", async () => {
+  clearAuthMessages();
   try {
     await signInWithPopup(fbAuth, googleProvider);
   } catch (err) {
     console.error("signIn:", err);
-    alert("Erro ao entrar: " + (err.message || err.code));
+    authMessage("login-error", "error", authErrorMessage(err));
   }
 });
 $("signout-btn").addEventListener("click", () => signOut(fbAuth));

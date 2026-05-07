@@ -133,6 +133,85 @@
     color: #1d3557;
     margin-top: 10px;
   }
+  .history-card {
+    border: 1px solid #e5e5ea;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    background: #fafbfc;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .history-meta { font-size: 13px; flex: 1; min-width: 240px; }
+  .history-meta .denom { font-weight: 600; color: #1d3557; margin-bottom: 2px; }
+  .history-meta .submeta { color: #666; font-size: 12px; }
+  .history-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .history-actions .btn { padding: 6px 12px; font-size: 12px; }
+  .history-empty { color: #888; font-size: 13px; font-style: italic; margin: 0; }
+  .history-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .history-controls .btn { padding: 6px 12px; font-size: 12px; }
+  .folder-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 0;
+    border-top: 1px dashed #e5e5ea;
+    border-bottom: 1px dashed #e5e5ea;
+    margin-bottom: 12px;
+  }
+  .folder-chip {
+    padding: 5px 12px;
+    border-radius: 16px;
+    border: 1px solid #d2d2d7;
+    background: white;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: #1d3557;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .folder-chip:hover { background: #f0f0f5; }
+  .folder-chip.active { background: #1d3557; color: white; border-color: #1d3557; }
+  .folder-chip .count {
+    background: rgba(0,0,0,0.08);
+    border-radius: 10px;
+    padding: 0 6px;
+    font-size: 11px;
+    color: inherit;
+  }
+  .folder-chip.active .count { background: rgba(255,255,255,0.25); }
+  .folder-chip.new-folder { border-style: dashed; }
+  .folder-chip.actions-chip { border-style: dashed; color: #6c757d; }
+  .history-group-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1d3557;
+    margin: 14px 0 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .history-group-title:first-child { margin-top: 0; }
+  .move-select {
+    padding: 4px 6px;
+    font-size: 12px;
+    border: 1px solid #d2d2d7;
+    border-radius: 4px;
+    background: white;
+    color: #555;
+    cursor: pointer;
+  }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -182,6 +261,23 @@
     </div>
     <div class="info-box" id="action-info"></div>
   </section>
+
+  <section id="history-section">
+    <h2>6. Histórico de conversões</h2>
+    <p style="margin-top:0; font-size:13px; color:#555;">
+      Cada PDF convertido é salvo automaticamente neste navegador (IndexedDB). Você pode reabrir, baixar de novo, ou exportar como JSON pra fazer backup / migrar pra outro computador.
+    </p>
+    <div class="history-controls">
+      <button class="btn secondary" id="export-history-btn">Exportar histórico (JSON)</button>
+      <button class="btn secondary" id="import-history-btn">Importar JSON</button>
+      <input type="file" id="import-history-input" accept=".json,application/json" hidden>
+      <button class="btn danger" id="clear-history-btn">Apagar todo o histórico</button>
+    </div>
+    <div class="folder-chips" id="folder-chips"></div>
+    <div id="history-list">
+      <p class="history-empty">Nenhum registro salvo ainda. PDFs convertidos aparecerão aqui automaticamente.</p>
+    </div>
+  </section>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -194,6 +290,90 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 
 // ===== Estado global =====
 let parsedPdf = null;
+let currentFilename = "";
+
+// ===== IndexedDB (histórico) =====
+const DB_NAME = "ConversorSIGEF";
+const DB_VERSION = 1;
+const STORE = "registros";
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE)) {
+        const store = db.createObjectStore(STORE, { keyPath: "id" });
+        store.createIndex("createdAt", "createdAt");
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function saveRecord(rec) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).put(rec);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function listRecords() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readonly");
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => {
+      const arr = req.result || [];
+      arr.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+      resolve(arr);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function getRecord(id) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readonly");
+    const req = tx.objectStore(STORE).get(id);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function deleteRecord(id) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).delete(id);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function clearAllRecords() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).clear();
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function genId() {
+  if (crypto && crypto.randomUUID) return crypto.randomUUID();
+  return Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+}
+
+function escapeHtml(s) {
+  return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
 
 // ===== UI helpers =====
 const $ = id => document.getElementById(id);
@@ -210,6 +390,7 @@ $("upload-btn").addEventListener("click", () => $("pdf-input").click());
 $("pdf-input").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
+  currentFilename = file.name;
   setStatus("Lendo PDF...", null);
   hide("header-section");
   hide("conf-section");
@@ -621,7 +802,7 @@ $("generate-btn").addEventListener("click", async () => {
     }
   }
 
-  // Salvar em localStorage
+  // Salvar em localStorage (memória de conectores reusáveis)
   for (const [label, txt] of Object.entries(map)) {
     if (txt) localStorage.setItem(memoryKey(label), txt);
     else localStorage.removeItem(memoryKey(label));
@@ -639,8 +820,364 @@ $("generate-btn").addEventListener("click", async () => {
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 
-  $("action-info").textContent = `Arquivo gerado: ${filename}`;
+  // Salvar no histórico (IndexedDB)
+  try {
+    const record = {
+      id: parsedPdf.recordId || genId(),
+      createdAt: new Date().toISOString(),
+      filename: currentFilename || filename,
+      denominacao: parsedPdf.header.denominacao || "",
+      matricula:   parsedPdf.header.matricula   || "",
+      proprietario:parsedPdf.header.proprietario|| "",
+      area:        parsedPdf.header.area        || "",
+      perimetro:   parsedPdf.header.perimetro   || "",
+      header:      parsedPdf.header,
+      rows:        parsedPdf.rows,
+      groups:      parsedPdf.groups,
+      conectores:  map,
+      generatedText: text
+    };
+    parsedPdf.recordId = record.id;
+    await saveRecord(record);
+    await renderHistory();
+    $("action-info").textContent = `Arquivo gerado: ${filename} • salvo no histórico`;
+  } catch (err) {
+    console.error(err);
+    $("action-info").textContent = `Arquivo gerado: ${filename} • (falha ao salvar histórico: ${err.message})`;
+  }
 });
+
+// ===== Pastas =====
+const EMPTY_FOLDERS_KEY = "emptyFolders";
+let currentFolderFilter = null; // null = todas; "" = sem pasta; "Nome" = pasta específica
+
+function getEmptyFolders() {
+  try { return JSON.parse(localStorage.getItem(EMPTY_FOLDERS_KEY) || "[]"); }
+  catch { return []; }
+}
+function setEmptyFolders(arr) {
+  localStorage.setItem(EMPTY_FOLDERS_KEY, JSON.stringify(arr));
+}
+
+function allFolders(records) {
+  const set = new Set();
+  for (const r of records) if (r.folder) set.add(r.folder);
+  for (const f of getEmptyFolders()) set.add(f);
+  return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
+}
+
+async function renderFolderChips(records) {
+  const chipsEl = $("folder-chips");
+  chipsEl.innerHTML = "";
+
+  const folders = allFolders(records);
+  const counts = {};
+  counts.__all__ = records.length;
+  counts.__none__ = records.filter(r => !r.folder).length;
+  for (const f of folders) counts[f] = records.filter(r => r.folder === f).length;
+
+  function makeChip(label, value, count, extraClass = "") {
+    const chip = document.createElement("button");
+    chip.className = "folder-chip" + (currentFolderFilter === value ? " active" : "") + (extraClass ? " " + extraClass : "");
+    chip.innerHTML = `<span>${escapeHtml(label)}</span>` + (count !== null ? `<span class="count">${count}</span>` : "");
+    chip.addEventListener("click", async () => {
+      currentFolderFilter = value;
+      await renderHistory();
+    });
+    return chip;
+  }
+
+  chipsEl.appendChild(makeChip("Todas", null, counts.__all__));
+  if (counts.__none__ > 0) chipsEl.appendChild(makeChip("Sem pasta", "", counts.__none__));
+  for (const f of folders) {
+    chipsEl.appendChild(makeChip("📁 " + f, f, counts[f]));
+  }
+
+  const newBtn = document.createElement("button");
+  newBtn.className = "folder-chip new-folder";
+  newBtn.textContent = "+ Nova pasta";
+  newBtn.addEventListener("click", async () => {
+    const name = (prompt("Nome da nova pasta:") || "").trim();
+    if (!name) return;
+    const empty = getEmptyFolders();
+    if (!folders.includes(name) && !empty.includes(name)) {
+      empty.push(name);
+      setEmptyFolders(empty);
+    }
+    currentFolderFilter = name;
+    await renderHistory();
+  });
+  chipsEl.appendChild(newBtn);
+
+  if (currentFolderFilter && currentFolderFilter !== "") {
+    const manageBtn = document.createElement("button");
+    manageBtn.className = "folder-chip actions-chip";
+    manageBtn.textContent = "⋯ Renomear/excluir pasta";
+    manageBtn.addEventListener("click", async () => {
+      const choice = prompt(`Pasta "${currentFolderFilter}":\n\nDigite o NOVO NOME para renomear, ou deixe vazio e clique OK para EXCLUIR a pasta (registros vão para "Sem pasta").`, currentFolderFilter);
+      if (choice === null) return; // cancelou
+      const newName = choice.trim();
+      const oldName = currentFolderFilter;
+      if (newName === oldName) return;
+      // Aplicar mudança a todos os registros
+      const all = await listRecords();
+      for (const r of all) {
+        if (r.folder === oldName) {
+          r.folder = newName || "";
+          await saveRecord(r);
+        }
+      }
+      // Atualizar lista de pastas vazias
+      let empty = getEmptyFolders().filter(f => f !== oldName);
+      if (newName && !empty.includes(newName) && !all.some(r => r.folder === newName)) {
+        empty.push(newName);
+      }
+      setEmptyFolders(empty);
+      currentFolderFilter = newName || null;
+      await renderHistory();
+    });
+    chipsEl.appendChild(manageBtn);
+  }
+}
+
+async function moveRecord(id, newFolder) {
+  const rec = await getRecord(id);
+  if (!rec) return;
+  rec.folder = newFolder || "";
+  await saveRecord(rec);
+  // Se a nova pasta era "vazia" e agora tem ≥1 registro, podemos remover do emptyFolders
+  if (newFolder) {
+    const empty = getEmptyFolders().filter(f => f !== newFolder);
+    setEmptyFolders(empty);
+  }
+  await renderHistory();
+}
+
+// ===== UI do histórico =====
+async function renderHistory() {
+  const list = $("history-list");
+  let records;
+  try {
+    records = await listRecords();
+  } catch (err) {
+    list.innerHTML = `<p class="history-empty">Erro ao carregar histórico: ${escapeHtml(err.message)}</p>`;
+    return;
+  }
+
+  await renderFolderChips(records);
+
+  if (records.length === 0) {
+    list.innerHTML = '<p class="history-empty">Nenhum registro salvo ainda. PDFs convertidos aparecerão aqui automaticamente.</p>';
+    return;
+  }
+
+  // Filtrar conforme pasta selecionada
+  let filtered;
+  if (currentFolderFilter === null) filtered = records; // Todas
+  else if (currentFolderFilter === "") filtered = records.filter(r => !r.folder);
+  else filtered = records.filter(r => r.folder === currentFolderFilter);
+
+  list.innerHTML = "";
+
+  if (filtered.length === 0) {
+    const msg = document.createElement("p");
+    msg.className = "history-empty";
+    msg.textContent = "Nenhum registro nesta pasta. Use 'Mover' nos cartões pra organizar.";
+    list.appendChild(msg);
+    return;
+  }
+
+  // Quando "Todas", agrupar por pasta
+  if (currentFolderFilter === null) {
+    const buckets = new Map();
+    for (const r of filtered) {
+      const key = r.folder || "__none__";
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push(r);
+    }
+    const orderedKeys = [
+      ...Array.from(buckets.keys()).filter(k => k !== "__none__").sort((a, b) => a.localeCompare(b, "pt-BR")),
+      ...(buckets.has("__none__") ? ["__none__"] : [])
+    ];
+    for (const key of orderedKeys) {
+      const title = document.createElement("div");
+      title.className = "history-group-title";
+      title.textContent = key === "__none__" ? "Sem pasta" : "📁 " + key;
+      list.appendChild(title);
+      for (const r of buckets.get(key)) list.appendChild(makeHistoryCard(r, records));
+    }
+  } else {
+    for (const r of filtered) list.appendChild(makeHistoryCard(r, records));
+  }
+}
+
+function makeHistoryCard(r, allRecords) {
+  const card = document.createElement("div");
+  card.className = "history-card";
+
+  const meta = document.createElement("div");
+  meta.className = "history-meta";
+  let dateStr = "";
+  try { dateStr = new Date(r.createdAt).toLocaleString("pt-BR"); } catch (e) { dateStr = r.createdAt || ""; }
+  meta.innerHTML = `
+    <div class="denom">${escapeHtml(r.denominacao || "(sem denominação)")}</div>
+    <div class="submeta">Mat. ${escapeHtml(r.matricula || "?")} • ${escapeHtml(r.proprietario || "?")}</div>
+    <div class="submeta">${escapeHtml(r.area || "")}${r.area && r.perimetro ? " • " : ""}${r.perimetro ? "Perímetro " + escapeHtml(r.perimetro) : ""}</div>
+    <div class="submeta">${escapeHtml(dateStr)} • ${escapeHtml(r.filename || "")}</div>
+  `;
+  card.appendChild(meta);
+
+  const actions = document.createElement("div");
+  actions.className = "history-actions";
+
+  // Move-to-folder dropdown
+  const moveSel = document.createElement("select");
+  moveSel.className = "move-select";
+  moveSel.title = "Mover para pasta";
+  const folders = allFolders(allRecords);
+  const options = [
+    { value: "", label: "📁 Sem pasta" },
+    ...folders.map(f => ({ value: f, label: "📁 " + f })),
+    { value: "__new__", label: "+ Nova pasta..." }
+  ];
+  for (const o of options) {
+    const opt = document.createElement("option");
+    opt.value = o.value;
+    opt.textContent = o.label;
+    if ((r.folder || "") === o.value) opt.selected = true;
+    moveSel.appendChild(opt);
+  }
+  moveSel.addEventListener("change", async (e) => {
+    const v = e.target.value;
+    if (v === "__new__") {
+      const name = (prompt("Nome da nova pasta:") || "").trim();
+      if (!name) {
+        moveSel.value = r.folder || "";
+        return;
+      }
+      await moveRecord(r.id, name);
+    } else {
+      await moveRecord(r.id, v);
+    }
+  });
+  actions.appendChild(moveSel);
+
+  const openBtn = document.createElement("button");
+  openBtn.className = "btn secondary";
+  openBtn.textContent = "Abrir";
+  openBtn.addEventListener("click", () => loadRecord(r.id));
+  actions.appendChild(openBtn);
+
+  const dlBtn = document.createElement("button");
+  dlBtn.className = "btn";
+  dlBtn.textContent = "Word";
+  dlBtn.title = "Baixar Word";
+  dlBtn.addEventListener("click", async () => {
+    const rec = await getRecord(r.id);
+    if (!rec) return;
+    const blob = await generateDocxBlob(rec.generatedText || "");
+    const denom = (rec.denominacao || "memorial").replace(/[\\\/:*?"<>|]/g, "");
+    const fn = `${denom}${rec.matricula ? " - Mat " + rec.matricula : ""}.docx`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = fn;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+  actions.appendChild(dlBtn);
+
+  const delBtn = document.createElement("button");
+  delBtn.className = "btn danger";
+  delBtn.textContent = "Excluir";
+  delBtn.addEventListener("click", async () => {
+    if (!confirm(`Excluir "${r.denominacao || r.filename}" do histórico?`)) return;
+    await deleteRecord(r.id);
+    if (parsedPdf && parsedPdf.recordId === r.id) parsedPdf.recordId = null;
+    await renderHistory();
+  });
+  actions.appendChild(delBtn);
+
+  card.appendChild(actions);
+  return card;
+}
+
+async function loadRecord(id) {
+  const rec = await getRecord(id);
+  if (!rec) return;
+  parsedPdf = {
+    header: rec.header || {},
+    rows: rec.rows || [],
+    groups: rec.groups || [],
+    recordId: rec.id
+  };
+  currentFilename = rec.filename || "";
+  // Reaplicar conectores no localStorage para que renderConfrontations preencha
+  if (rec.conectores) {
+    for (const [label, txt] of Object.entries(rec.conectores)) {
+      if (txt) localStorage.setItem(memoryKey(label), txt);
+    }
+  }
+  renderHeader(parsedPdf.header);
+  renderConfrontations(parsedPdf.groups);
+  if (rec.generatedText) {
+    $("preview-text").value = rec.generatedText;
+  } else {
+    refreshPreview();
+  }
+  show("header-section");
+  show("conf-section");
+  show("preview-section");
+  show("actions-section");
+  setStatus(`Registro restaurado: ${rec.filename || rec.denominacao || ""}`, "ok");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+$("export-history-btn").addEventListener("click", async () => {
+  const records = await listRecords();
+  if (records.length === 0) {
+    alert("Nenhum registro para exportar.");
+    return;
+  }
+  const blob = new Blob([JSON.stringify(records, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `conversor-sigef-historico-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+$("import-history-btn").addEventListener("click", () => $("import-history-input").click());
+
+$("import-history-input").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const records = JSON.parse(text);
+    if (!Array.isArray(records)) throw new Error("Arquivo inválido — esperado JSON com array de registros");
+    let count = 0;
+    for (const r of records) {
+      if (!r.id) r.id = genId();
+      await saveRecord(r);
+      count++;
+    }
+    await renderHistory();
+    alert(`Importados ${count} registro(s).`);
+  } catch (err) {
+    alert("Erro ao importar: " + err.message);
+  }
+  e.target.value = "";
+});
+
+$("clear-history-btn").addEventListener("click", async () => {
+  if (!confirm("Apagar TODO o histórico do navegador? Os arquivos Word já baixados não são afetados.")) return;
+  await clearAllRecords();
+  await renderHistory();
+});
+
+// Inicialização — popular histórico ao abrir a página
+renderHistory();
 
 $("clear-memory-btn").addEventListener("click", () => {
   if (!confirm("Apagar todas as confrontações salvas no navegador? (Os textos digitados em PDFs anteriores serão perdidos.)")) return;

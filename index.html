@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conversor SIGEF — PDF para Word</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    background: #f5f5f7;
+    color: #1d1d1f;
+    line-height: 1.5;
+  }
+  header {
+    background: #1d3557;
+    color: white;
+    padding: 24px 32px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  header h1 { margin: 0; font-size: 22px; font-weight: 600; }
+  header p  { margin: 4px 0 0; opacity: 0.9; font-size: 14px; }
+  main {
+    max-width: 980px;
+    margin: 24px auto;
+    padding: 0 24px;
+  }
+  section {
+    background: white;
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  h2 { margin-top: 0; font-size: 16px; color: #1d3557; border-bottom: 1px solid #e5e5ea; padding-bottom: 8px; }
+  .file-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  input[type="file"] { display: none; }
+  .btn {
+    background: #1d3557;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.15s;
+  }
+  .btn:hover { background: #2a4a73; }
+  .btn:disabled { background: #999; cursor: not-allowed; }
+  .btn.secondary { background: #6c757d; }
+  .btn.secondary:hover { background: #5a6268; }
+  .btn.danger { background: #c0392b; }
+  .btn.danger:hover { background: #a32d20; }
+  .status {
+    color: #555;
+    font-size: 13px;
+  }
+  .status.error { color: #c0392b; font-weight: 500; }
+  .status.ok    { color: #2a8c4a; font-weight: 500; }
+  .header-grid {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 16px;
+    font-size: 13px;
+  }
+  .header-grid dt { font-weight: 600; color: #555; }
+  .header-grid dd { margin: 0; }
+  .conf-group {
+    border: 1px solid #e5e5ea;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    background: #fafbfc;
+  }
+  .conf-group .truncated {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    background: #fff3cd;
+    padding: 6px 10px;
+    border-radius: 4px;
+    color: #5d4d00;
+    margin-bottom: 8px;
+    word-break: break-word;
+  }
+  .conf-group .seg-count {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 8px;
+  }
+  .conf-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 4px;
+  }
+  textarea {
+    width: 100%;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 8px 10px;
+    border: 1px solid #d2d2d7;
+    border-radius: 4px;
+    resize: vertical;
+  }
+  textarea:focus { outline: none; border-color: #1d3557; }
+  .preview-box {
+    width: 100%;
+    min-height: 220px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    background: #fafbfc;
+  }
+  .actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .info-box {
+    background: #e8f0fe;
+    border-left: 3px solid #1d3557;
+    padding: 10px 14px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #1d3557;
+    margin-top: 10px;
+  }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Conversor SIGEF</h1>
+  <p>Memorial Descritivo PDF → Word (descrição literária)</p>
+</header>
+
+<main>
+  <section id="upload-section">
+    <h2>1. Selecione o PDF</h2>
+    <div class="file-row">
+      <input type="file" id="pdf-input" accept=".pdf,application/pdf">
+      <button class="btn" id="upload-btn">Selecionar PDF</button>
+      <span class="status" id="status">Nenhum arquivo carregado.</span>
+    </div>
+  </section>
+
+  <section id="header-section" class="hidden">
+    <h2>2. Cabeçalho extraído</h2>
+    <dl class="header-grid" id="header-grid"></dl>
+  </section>
+
+  <section id="conf-section" class="hidden">
+    <h2>3. Confrontações detectadas</h2>
+    <p style="margin-top:0; font-size:13px; color:#555;">
+      Para cada confrontação detectada no PDF, escreva o texto-conector completo (com nome, CPF, RG, COMARCA quando aplicável). Seu texto fica salvo no navegador e é reaproveitado nos próximos PDFs.
+    </p>
+    <div id="conf-list"></div>
+  </section>
+
+  <section id="preview-section" class="hidden">
+    <h2>4. Pré-visualização do texto</h2>
+    <p style="margin-top:0; font-size:13px; color:#555;">
+      Pode editar este texto livremente antes de gerar o Word.
+    </p>
+    <textarea id="preview-text" class="preview-box" rows="14" spellcheck="false"></textarea>
+    <button class="btn secondary" id="refresh-preview" style="margin-top:8px;">Recarregar do formulário</button>
+  </section>
+
+  <section id="actions-section" class="hidden">
+    <h2>5. Gerar Word</h2>
+    <div class="actions">
+      <button class="btn" id="generate-btn">Gerar e baixar .docx</button>
+      <button class="btn danger" id="clear-memory-btn">Limpar memória de confrontações</button>
+    </div>
+    <div class="info-box" id="action-info"></div>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+"use strict";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+// ===== Estado global =====
+let parsedPdf = null;
+
+// ===== UI helpers =====
+const $ = id => document.getElementById(id);
+function setStatus(msg, type) {
+  const s = $("status");
+  s.textContent = msg;
+  s.className = "status" + (type ? " " + type : "");
+}
+function show(id) { $(id).classList.remove("hidden"); }
+function hide(id) { $(id).classList.add("hidden"); }
+
+// ===== Upload =====
+$("upload-btn").addEventListener("click", () => $("pdf-input").click());
+$("pdf-input").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  setStatus("Lendo PDF...", null);
+  hide("header-section");
+  hide("conf-section");
+  hide("preview-section");
+  hide("actions-section");
+  try {
+    parsedPdf = await parsePdf(file);
+    setStatus(`PDF carregado: ${file.name} (${parsedPdf.rows.length} segmentos, ${parsedPdf.groups.length} grupos de confrontação)`, "ok");
+    renderHeader(parsedPdf.header);
+    renderConfrontations(parsedPdf.groups);
+    refreshPreview();
+    show("header-section");
+    show("conf-section");
+    show("preview-section");
+    show("actions-section");
+  } catch (err) {
+    console.error(err);
+    setStatus("Erro ao processar PDF: " + err.message, "error");
+  }
+});
+
+// ===== Parsing do PDF =====
+async function parsePdf(file) {
+  const data = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data}).promise;
+
+  // 1) Pegar texto agrupado por linha (Y) usando posições, página por página.
+  const allLines = [];
+  let firstPageLines = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    const lines = groupItemsByLine(tc.items);
+    if (p === 1) firstPageLines = lines.map(l => l.text);
+    for (const line of lines) {
+      allLines.push(line.text);
+    }
+  }
+
+  // 2) Cabeçalho — extrair via regex linha-a-linha na página 1.
+  const header = extractHeader(firstPageLines);
+
+  // 3) Linhas de dados — regex em cada linha agrupada.
+  // Vértices podem ter prefixos diversos (DVRW, SUAS, SEPC, ...) — qualquer 2-5 letras.
+  const rows = [];
+  const rowRegex = /^([A-Z]{2,5}-[A-Z]-\d+)\s+(-?\d+°\d+'\d+,\d+")\s+(-?\d+°\d+'\d+,\d+")\s+([\d,\.]+)\s+([A-Z]{2,5}-[A-Z]-\d+)\s+(\d+°\d+')\s+([\d,\.]+)\s+(.+?)$/;
+  for (const line of allLines) {
+    const cleaned = line.replace(/\s+/g, " ").trim();
+    const m = cleaned.match(rowRegex);
+    if (m) {
+      rows.push({
+        vCode:  m[1],
+        lon:    m[2],
+        lat:    m[3],
+        alt:    m[4],
+        nextCode: m[5],
+        azimute: m[6],
+        dist:    m[7],
+        confront: m[8].trim()
+      });
+    }
+  }
+
+  if (rows.length === 0) {
+    throw new Error("Nenhuma linha de dados encontrada. Verifique se o PDF é um Memorial Descritivo do SIGEF.");
+  }
+
+  // 4) Agrupar linhas consecutivas com mesma confrontação.
+  const groups = [];
+  for (const row of rows) {
+    const last = groups[groups.length - 1];
+    if (!last || last.label !== row.confront) {
+      groups.push({label: row.confront, segments: [row]});
+    } else {
+      last.segments.push(row);
+    }
+  }
+
+  return {header, rows, groups};
+}
+
+function groupItemsByLine(items) {
+  // PDF.js: transform = [a, b, c, d, e, f]; e = x, f = y.
+  // Items próximos em Y formam uma linha.
+  const sorted = items.filter(i => i.str && i.str.trim() !== "")
+                       .map(i => ({ ...i, x: i.transform[4], y: i.transform[5] }))
+                       .sort((a, b) => b.y - a.y || a.x - b.x);
+  const lines = [];
+  const yTolerance = 3;
+  for (const it of sorted) {
+    let placed = false;
+    for (const ln of lines) {
+      if (Math.abs(ln.y - it.y) < yTolerance) {
+        ln.items.push(it);
+        ln.y = (ln.y * (ln.items.length - 1) + it.y) / ln.items.length;
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) lines.push({ y: it.y, items: [it] });
+  }
+  // Para cada linha, ordenar por X e juntar com espaço.
+  return lines.map(ln => {
+    ln.items.sort((a, b) => a.x - b.x);
+    return { y: ln.y, text: ln.items.map(i => i.str).join(" ") };
+  });
+}
+
+function extractHeader(lines) {
+  // Processa linha-a-linha das linhas agrupadas por Y (cada linha contém colunas L+R do PDF).
+  const cleaned = lines.map(l => l.replace(/\s+/g, " ").trim());
+  const out = {};
+  // Patterns: chave → regex que casa em UMA linha; o grupo 1 é o valor.
+  const patterns = [
+    ["denominacao",   /Denominação:\s*(.+?)(?:\s+Natureza|$)/i],
+    ["natureza",      /Natureza da Área:\s*(.+?)$/i],
+    ["proprietario",  /Proprietário\(a\):\s*(.+?)(?:\s+CPF:|$)/i],
+    ["cpf",           /CPF:\s*([\d\.\-\/]+)/],
+    ["matricula",     /Matrícula do imóvel:\s*(.+?)(?:\s+Código|$)/i],
+    ["incra",         /Código INCRA\/SNCR:\s*(\d+)/i],
+    ["municipio",     /Município\/UF:\s*(.+?)(?:\s+Cartório|$)/i],
+    ["cartorio",      /Cartório \(CNS\):\s*(.+?)$/i],
+    ["responsavel",   /Responsável Técnico\(a\):\s*(.+?)$/i],
+    ["formacao",      /Formação:\s*(.+?)$/i],
+    ["credenciamento",/Código de credenciamento:\s*(.+?)(?:\s+Conselho|$)/i],
+    ["conselho",      /Conselho Profissional:\s*(\S+)/i],
+    ["rt",            /Documento de RT:\s*(.+?)$/i],
+    ["sgr",           /Sistema Geodésico de referência:\s*(.+?)(?:\s+Documento|$)/i],
+    ["area",          /Área \(Sistema Geodésico Local\):\s*([\d,\.]+\s*ha)/i],
+    ["perimetro",     /Perímetro \(m\):\s*([\d,\.]+\s*m)/i]
+  ];
+  for (const ln of cleaned) {
+    for (const [key, re] of patterns) {
+      if (out[key]) continue;
+      const m = ln.match(re);
+      if (m) out[key] = m[1].trim();
+    }
+  }
+  // Garantir que todas as chaves existam (mesmo que vazias)
+  for (const [key] of patterns) if (!(key in out)) out[key] = "";
+  return out;
+}
+
+// ===== Render header =====
+function renderHeader(h) {
+  const grid = $("header-grid");
+  grid.innerHTML = "";
+  const items = [
+    ["Denominação", h.denominacao],
+    ["Proprietário", h.proprietario],
+    ["CPF", h.cpf],
+    ["Matrícula", h.matricula],
+    ["Município/UF", h.municipio],
+    ["Cartório (CNS)", h.cartorio],
+    ["Código INCRA/SNCR", h.incra],
+    ["Responsável Técnico", h.responsavel],
+    ["Documento RT", h.rt],
+    ["Área", h.area],
+    ["Perímetro", h.perimetro]
+  ];
+  for (const [k, v] of items) {
+    if (!v) continue;
+    const dt = document.createElement("dt");
+    dt.textContent = k + ":";
+    const dd = document.createElement("dd");
+    dd.textContent = v;
+    grid.appendChild(dt);
+    grid.appendChild(dd);
+  }
+}
+
+// ===== Render confrontations =====
+function normLabel(label) {
+  return label.toLowerCase().replace(/\s+/g, " ").trim();
+}
+function memoryKey(label) { return "confrontante:" + normLabel(label); }
+
+function renderConfrontations(groups) {
+  const list = $("conf-list");
+  list.innerHTML = "";
+
+  // Agrupar por label único; manter ordem de primeira aparição.
+  const uniqueLabels = [];
+  const seen = new Set();
+  for (const g of groups) {
+    if (!seen.has(g.label)) { uniqueLabels.push(g.label); seen.add(g.label); }
+  }
+
+  // Contar segmentos totais por label (somando ocorrências).
+  const segCount = {};
+  for (const g of groups) {
+    segCount[g.label] = (segCount[g.label] || 0) + g.segments.length;
+  }
+
+  uniqueLabels.forEach((label, idx) => {
+    const div = document.createElement("div");
+    div.className = "conf-group";
+
+    const trunc = document.createElement("div");
+    trunc.className = "truncated";
+    trunc.textContent = label;
+    div.appendChild(trunc);
+
+    const meta = document.createElement("div");
+    meta.className = "seg-count";
+    const occCount = groups.filter(g => g.label === label).length;
+    meta.textContent = `${segCount[label]} segmento(s) em ${occCount} ocorrência(s) no perímetro`;
+    div.appendChild(meta);
+
+    const lbl = document.createElement("label");
+    lbl.textContent = `Conector ${idx + 1}: texto que aparece antes da lista de azimutes`;
+    div.appendChild(lbl);
+
+    const ta = document.createElement("textarea");
+    ta.rows = 4;
+    ta.dataset.confLabel = label;
+    ta.placeholder = sugestaoConector(label);
+    const stored = localStorage.getItem(memoryKey(label));
+    if (stored) ta.value = stored;
+    ta.addEventListener("input", refreshPreview);
+    div.appendChild(ta);
+
+    list.appendChild(div);
+  });
+}
+
+function sugestaoConector(label) {
+  const lower = label.toLowerCase();
+  if (lower.includes("estrada")) {
+    return "Ex: deste segue pela faixa de domínio da ESTRADA MUNICIPAL";
+  }
+  if (lower.includes("rio") || lower.includes("córrego") || lower.includes("ribeirão")) {
+    return "Ex: deste segue pelo leito do RIO/CÓRREGO ...";
+  }
+  return "Ex: deste segue confrontando com propriedade FAZENDA ... - MATRÍCULA. ..., CNS: ... COMARCA: ...; PROPRIEDADE DE ... - CPF: ... - RG: ...";
+}
+
+// ===== Construção do texto =====
+function getConectorMap() {
+  const map = {};
+  document.querySelectorAll("[data-conf-label]").forEach(ta => {
+    map[ta.dataset.confLabel] = ta.value.trim();
+  });
+  return map;
+}
+
+function buildBodyText(parsed, conectores) {
+  if (!parsed) return "";
+  const groups = parsed.groups;
+  if (groups.length === 0) return "";
+
+  const firstSeg = groups[0].segments[0];
+  let txt = `Inicia-se a descrição deste perímetro no vértice ${firstSeg.vCode}, de coordenadas Long: ${firstSeg.lon} W, Lat: ${firstSeg.lat} S e Altitude: ${firstSeg.alt} m;`;
+
+  for (let gi = 0; gi < groups.length; gi++) {
+    const g = groups[gi];
+    const conector = (conectores[g.label] || "").trim();
+    txt += " " + (conector || `[CONFRONTAÇÃO: ${g.label}]`) + ", com os seguintes azimutes e distâncias:";
+    for (let si = 0; si < g.segments.length; si++) {
+      const s = g.segments[si];
+      // Encontrar coordenadas do vértice de chegada (próximo segmento ou primeiro do próximo grupo)
+      const next = nextRowAfter(parsed, gi, si);
+      if (next) {
+        txt += ` ${s.azimute} e de ${s.dist}m até o vértice ${s.nextCode}, de coordenadas Lon: ${next.lon} W, Lat: ${next.lat} S e Altitude: ${next.alt} m;`;
+      } else {
+        // Última linha — vante volta ao vértice inicial
+        txt += ` ${s.azimute} e de ${s.dist}m até o vértice ${s.nextCode}, de coordenadas Lon: ${firstSeg.lon} W, Lat: ${firstSeg.lat} S e Altitude: ${firstSeg.alt} m;`;
+      }
+    }
+  }
+
+  txt += " ponto inicial da descrição deste perímetro: Todas as coordenadas aqui descritas estão georreferenciadas ao Sistema Geodésico Brasileiro, tendo como DATUM SIRGAS 2000. Todos os azimutes e distâncias, área e perímetro foram calculadas no sistema local de coordenadas com origem do plano definido pela média das coordenadas (SGL - Sistema Geodésico Local).";
+
+  const peri = (parsed.header.perimetro || "").replace(/\s*m$/, "").trim();
+  if (peri) txt += ` Perímetro: ${peri}m.`;
+  return txt;
+}
+
+function nextRowAfter(parsed, gi, si) {
+  // Retorna a próxima linha (do mesmo grupo ou próximo). null se for a última do PDF.
+  const group = parsed.groups[gi];
+  if (si + 1 < group.segments.length) return group.segments[si + 1];
+  if (gi + 1 < parsed.groups.length)  return parsed.groups[gi + 1].segments[0];
+  return null; // última linha
+}
+
+function refreshPreview() {
+  if (!parsedPdf) return;
+  const map = getConectorMap();
+  $("preview-text").value = buildBodyText(parsedPdf, map);
+}
+
+$("refresh-preview").addEventListener("click", refreshPreview);
+
+// ===== Geração do DOCX =====
+function xmlEscape(s) {
+  return s.replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+}
+
+function buildDocumentXml(text) {
+  const xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="both"/>
+        <w:rPr>
+          <w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>
+          <w:sz w:val="24"/>
+          <w:szCs w:val="24"/>
+        </w:rPr>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>
+          <w:color w:val="000000"/>
+          <w:sz w:val="24"/>
+          <w:szCs w:val="24"/>
+        </w:rPr>
+        <w:t xml:space="preserve">${xmlEscape(text)}</w:t>
+      </w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="11906" w:h="16838"/>
+      <w:pgMar w:top="1417" w:right="1701" w:bottom="1417" w:left="1701" w:header="708" w:footer="708" w:gutter="0"/>
+      <w:cols w:space="708"/>
+      <w:docGrid w:linePitch="360"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+  return xml;
+}
+
+const CONTENT_TYPES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+</Types>`;
+
+const RELS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+const DOC_RELS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+
+const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:docDefaults>
+    <w:rPrDefault>
+      <w:rPr>
+        <w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>
+        <w:sz w:val="24"/>
+        <w:szCs w:val="24"/>
+        <w:lang w:val="pt-BR" w:eastAsia="pt-BR" w:bidi="ar-SA"/>
+      </w:rPr>
+    </w:rPrDefault>
+    <w:pPrDefault>
+      <w:pPr>
+        <w:jc w:val="both"/>
+      </w:pPr>
+    </w:pPrDefault>
+  </w:docDefaults>
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+    <w:qFormat/>
+    <w:rPr>
+      <w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>
+      <w:sz w:val="24"/>
+      <w:szCs w:val="24"/>
+    </w:rPr>
+  </w:style>
+</w:styles>`;
+
+async function generateDocxBlob(text) {
+  const zip = new JSZip();
+  zip.file("[Content_Types].xml", CONTENT_TYPES_XML);
+  zip.folder("_rels").file(".rels", RELS_XML);
+  const word = zip.folder("word");
+  word.file("document.xml", buildDocumentXml(text));
+  word.file("styles.xml", STYLES_XML);
+  word.folder("_rels").file("document.xml.rels", DOC_RELS_XML);
+  return zip.generateAsync({type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+}
+
+function suggestedFilename() {
+  if (!parsedPdf) return "memorial.docx";
+  const denom = (parsedPdf.header.denominacao || "memorial").replace(/[\\\/:*?"<>|]/g, "");
+  const mat = (parsedPdf.header.matricula || "").trim();
+  return `${denom}${mat ? " - Mat " + mat : ""}.docx`;
+}
+
+$("generate-btn").addEventListener("click", async () => {
+  if (!parsedPdf) return;
+  // Validar que todos os conectores estão preenchidos
+  const map = getConectorMap();
+  const empty = Object.entries(map).filter(([_, v]) => !v).map(([k]) => k);
+  if (empty.length > 0) {
+    if (!confirm(`Há ${empty.length} confrontação(ões) sem conector preenchido. Gerar mesmo assim? (Marcadores [CONFRONTAÇÃO: ...] aparecerão no Word.)`)) {
+      return;
+    }
+  }
+
+  // Salvar em localStorage
+  for (const [label, txt] of Object.entries(map)) {
+    if (txt) localStorage.setItem(memoryKey(label), txt);
+    else localStorage.removeItem(memoryKey(label));
+  }
+
+  const text = $("preview-text").value;
+  const blob = await generateDocxBlob(text);
+  const filename = suggestedFilename();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  $("action-info").textContent = `Arquivo gerado: ${filename}`;
+});
+
+$("clear-memory-btn").addEventListener("click", () => {
+  if (!confirm("Apagar todas as confrontações salvas no navegador? (Os textos digitados em PDFs anteriores serão perdidos.)")) return;
+  const keys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith("confrontante:")) keys.push(k);
+  }
+  keys.forEach(k => localStorage.removeItem(k));
+  $("action-info").textContent = `Memória limpa: ${keys.length} entrada(s) removida(s).`;
+  // Recarregar formulário do PDF atual (para limpar campos)
+  if (parsedPdf) renderConfrontations(parsedPdf.groups);
+  refreshPreview();
+});
+</script>
+</body>
+</html>

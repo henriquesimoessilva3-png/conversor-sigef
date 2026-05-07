@@ -18,9 +18,116 @@
     color: white;
     padding: 24px 32px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
   }
   header h1 { margin: 0; font-size: 22px; font-weight: 600; }
   header p  { margin: 4px 0 0; opacity: 0.9; font-size: 14px; }
+  header .header-text { flex: 1; min-width: 240px; }
+  .user-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .user-bar img.avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+  }
+  .user-bar .role-badge {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(255,255,255,0.2);
+  }
+  .user-bar .role-badge.admin { background: #f4a261; color: #1d3557; }
+  .user-bar .role-badge.user { background: #2a9d8f; color: white; }
+  .user-bar .role-badge.pending { background: #e76f51; color: white; }
+  .user-bar .signout-btn {
+    background: rgba(255,255,255,0.15);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.3);
+    padding: 5px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .user-bar .signout-btn:hover { background: rgba(255,255,255,0.25); }
+  .auth-screen {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(135deg, #1d3557 0%, #457b9d 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 24px;
+  }
+  .auth-card {
+    background: white;
+    padding: 36px 40px;
+    border-radius: 12px;
+    text-align: center;
+    max-width: 420px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  }
+  .auth-card h1 { margin: 0 0 8px; font-size: 22px; color: #1d3557; }
+  .auth-card p { color: #666; margin: 8px 0; font-size: 14px; line-height: 1.6; }
+  .auth-card .signin-btn {
+    background: white;
+    border: 1px solid #d2d2d7;
+    color: #3c4043;
+    padding: 10px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+    transition: all 0.15s;
+  }
+  .auth-card .signin-btn:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .auth-card .signin-btn img { width: 20px; height: 20px; }
+  .auth-card .pending-info {
+    background: #fff3cd;
+    color: #5d4d00;
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin: 16px 0;
+  }
+  .admin-user-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid #e5e5ea;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .admin-user-row img { width: 28px; height: 28px; border-radius: 50%; }
+  .admin-user-row .info { flex: 1; min-width: 200px; font-size: 13px; }
+  .admin-user-row .email { font-weight: 600; color: #1d3557; }
+  .admin-user-row .submeta { color: #666; font-size: 12px; }
+  .admin-user-row .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .admin-user-row .actions .btn { padding: 5px 10px; font-size: 12px; }
+  .role-pill {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .role-pill.pending { background: #ffd6cc; color: #c0392b; }
+  .role-pill.user { background: #d4edda; color: #155724; }
+  .role-pill.admin { background: #ffeaa7; color: #5d4d00; }
   main {
     max-width: 980px;
     margin: 24px auto;
@@ -217,9 +324,47 @@
 </head>
 <body>
 <header>
-  <h1>Conversor SIGEF</h1>
-  <p>Memorial Descritivo PDF → Word (descrição literária)</p>
+  <div class="header-text">
+    <h1>Conversor SIGEF</h1>
+    <p>Memorial Descritivo PDF → Word (descrição literária)</p>
+  </div>
+  <div class="user-bar hidden" id="user-bar">
+    <img class="avatar" id="user-avatar" alt="">
+    <div>
+      <div id="user-email" style="font-weight:500;"></div>
+      <span class="role-badge" id="user-role-badge"></span>
+    </div>
+    <button class="signout-btn" id="signout-btn">Sair</button>
+  </div>
 </header>
+
+<div class="auth-screen" id="auth-screen">
+  <div class="auth-card">
+    <h1>Conversor SIGEF</h1>
+    <p>Faça login com sua conta Google para acessar a ferramenta.</p>
+    <button class="signin-btn" id="signin-btn">
+      <img src="https://www.google.com/favicon.ico" alt="">
+      Entrar com Google
+    </button>
+    <p style="font-size:11px; color:#999; margin-top:20px;">
+      Apenas usuários autorizados podem usar a ferramenta. Após o login, seu acesso ficará pendente até a aprovação do administrador.
+    </p>
+  </div>
+</div>
+
+<div class="auth-screen hidden" id="pending-screen">
+  <div class="auth-card">
+    <h1>⏳ Aguardando aprovação</h1>
+    <p>Seu cadastro foi recebido. O administrador precisa aprovar seu acesso antes que você possa usar a ferramenta.</p>
+    <div class="pending-info">
+      <strong>Conta:</strong> <span id="pending-email"></span>
+    </div>
+    <p style="font-size:12px; color:#888;">
+      Você pode fechar esta página. Quando seu acesso for liberado, será só fazer login novamente.
+    </p>
+    <button class="signin-btn" id="signout-pending-btn">Sair</button>
+  </div>
+</div>
 
 <main>
   <section id="upload-section">
@@ -262,6 +407,16 @@
     <div class="info-box" id="action-info"></div>
   </section>
 
+  <section id="admin-section" class="hidden">
+    <h2>👑 Admin — Gerenciar usuários</h2>
+    <p style="margin-top:0; font-size:13px; color:#555;">
+      Aprove ou bloqueie quem pode usar a ferramenta. Cada pessoa só vê os próprios dados.
+    </p>
+    <div id="admin-users-list">
+      <p class="history-empty">Carregando usuários...</p>
+    </div>
+  </section>
+
   <section id="history-section">
     <h2>6. Histórico de conversões</h2>
     <p style="margin-top:0; font-size:13px; color:#555;">
@@ -282,8 +437,30 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script>
-"use strict";
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+import {
+  getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection,
+  getDocs, query, orderBy, serverTimestamp, deleteField, writeBatch
+} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBvh-QE7-_KZzqqJMo3jU5QcP7YEDF557E",
+  authDomain: "conversor-sigef.firebaseapp.com",
+  projectId: "conversor-sigef",
+  storageBucket: "conversor-sigef.firebasestorage.app",
+  messagingSenderId: "1047186169204",
+  appId: "1:1047186169204:web:0d7adfbb82c6cd3f196021"
+};
+const ADMIN_EMAIL = "henriquesimoessilva3@gmail.com";
+
+const fbApp = initializeApp(firebaseConfig);
+const fbAuth = getAuth(fbApp);
+const fbDb = getFirestore(fbApp);
+const googleProvider = new GoogleAuthProvider();
 
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
@@ -292,78 +469,300 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 let parsedPdf = null;
 let currentFilename = "";
 
-// ===== IndexedDB (histórico) =====
-const DB_NAME = "ConversorSIGEF";
-const DB_VERSION = 1;
-const STORE = "registros";
+// ===== Firestore (histórico) =====
+// Estrutura: users/{uid}/records/{recordId} + users/{uid}/connectors/{key} + users/{uid}/meta/{doc}
+let currentUser = null;       // { uid, email, displayName, photoURL, role }
+let currentUserDoc = null;    // dados do user doc no Firestore
 
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        const store = db.createObjectStore(STORE, { keyPath: "id" });
-        store.createIndex("createdAt", "createdAt");
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+function requireUser() {
+  if (!currentUser) throw new Error("Não autenticado");
+  return currentUser;
+}
+
+function recordsCol() {
+  return collection(fbDb, "users", requireUser().uid, "records");
+}
+function recordRef(id) {
+  return doc(fbDb, "users", requireUser().uid, "records", id);
+}
+function connectorRef(key) {
+  return doc(fbDb, "users", requireUser().uid, "connectors", key);
+}
+function metaRef(name) {
+  return doc(fbDb, "users", requireUser().uid, "meta", name);
 }
 
 async function saveRecord(rec) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).put(rec);
-    tx.oncomplete = resolve;
-    tx.onerror = () => reject(tx.error);
-  });
+  // Strip undefined fields
+  const clean = JSON.parse(JSON.stringify(rec));
+  await setDoc(recordRef(clean.id), clean);
 }
 
 async function listRecords() {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, "readonly");
-    const req = tx.objectStore(STORE).getAll();
-    req.onsuccess = () => {
-      const arr = req.result || [];
-      arr.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-      resolve(arr);
-    };
-    req.onerror = () => reject(req.error);
-  });
+  if (!currentUser) return [];
+  try {
+    const snap = await getDocs(recordsCol());
+    const arr = [];
+    snap.forEach(d => arr.push(d.data()));
+    arr.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    return arr;
+  } catch (err) {
+    console.error("listRecords:", err);
+    return [];
+  }
 }
 
 async function getRecord(id) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, "readonly");
-    const req = tx.objectStore(STORE).get(id);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+  const snap = await getDoc(recordRef(id));
+  return snap.exists() ? snap.data() : null;
 }
 
 async function deleteRecord(id) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).delete(id);
-    tx.oncomplete = resolve;
-    tx.onerror = () => reject(tx.error);
-  });
+  await deleteDoc(recordRef(id));
 }
 
 async function clearAllRecords() {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).clear();
-    tx.oncomplete = resolve;
-    tx.onerror = () => reject(tx.error);
-  });
+  const snap = await getDocs(recordsCol());
+  const batch = writeBatch(fbDb);
+  snap.forEach(d => batch.delete(d.ref));
+  await batch.commit();
+}
+
+// ===== Cache de conectores e pastas (carregado uma vez por sessão) =====
+let connectorCache = new Map();    // normalizedLabel -> text
+let emptyFoldersCache = [];
+
+async function loadUserCaches() {
+  if (!currentUser) return;
+  // Conectores
+  connectorCache = new Map();
+  try {
+    const snap = await getDocs(collection(fbDb, "users", currentUser.uid, "connectors"));
+    snap.forEach(d => {
+      const data = d.data();
+      if (data.label && data.text) connectorCache.set(normLabel(data.label), data.text);
+    });
+  } catch (err) { console.error("loadConnectors:", err); }
+  // Pastas vazias (nomes sem registros)
+  try {
+    const s = await getDoc(metaRef("folders"));
+    emptyFoldersCache = s.exists() ? (s.data().empty || []) : [];
+  } catch (err) {
+    console.error("loadFolders:", err);
+    emptyFoldersCache = [];
+  }
+}
+
+function safeKey(s) {
+  // Firestore doc IDs cannot contain '/', and have 1500-byte limit
+  return encodeURIComponent(s).replace(/%/g, "_").slice(0, 500);
+}
+
+function getConnectorMemory(label) {
+  return connectorCache.get(normLabel(label)) || "";
+}
+
+async function setConnectorMemory(label, text) {
+  const key = normLabel(label);
+  if (text) {
+    connectorCache.set(key, text);
+    try {
+      await setDoc(connectorRef(safeKey(key)), { label, text, normalized: key });
+    } catch (err) { console.error("setConnector:", err); }
+  } else {
+    connectorCache.delete(key);
+    try {
+      await deleteDoc(connectorRef(safeKey(key)));
+    } catch (err) { /* ignore — pode não existir */ }
+  }
+}
+
+async function clearConnectorMemory() {
+  connectorCache.clear();
+  try {
+    const snap = await getDocs(collection(fbDb, "users", currentUser.uid, "connectors"));
+    const batch = writeBatch(fbDb);
+    snap.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  } catch (err) { console.error("clearConnectorMemory:", err); }
+}
+
+// ===== Autenticação e gerenciamento de usuários =====
+async function ensureUserDoc(user) {
+  const ref = doc(fbDb, "users", user.uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    const isAdmin = user.email === ADMIN_EMAIL;
+    const data = {
+      uid: user.uid,
+      email: user.email || "",
+      displayName: user.displayName || "",
+      photoURL: user.photoURL || "",
+      role: isAdmin ? "admin" : "pending",
+      createdAt: new Date().toISOString()
+    };
+    await setDoc(ref, data);
+    return data;
+  }
+  const data = snap.data();
+  // Auto-promover o e-mail admin caso o doc tenha sido criado antes da regra
+  if (user.email === ADMIN_EMAIL && data.role !== "admin") {
+    try {
+      await updateDoc(ref, { role: "admin" });
+      data.role = "admin";
+    } catch (err) { console.warn("auto-promote admin:", err); }
+  }
+  return data;
+}
+
+function showAuthScreen() {
+  show("auth-screen");
+  hide("pending-screen");
+  hide("user-bar");
+  ["header-section", "conf-section", "preview-section", "actions-section", "admin-section", "history-section"].forEach(hide);
+}
+
+function showPendingScreen() {
+  hide("auth-screen");
+  show("pending-screen");
+  hide("user-bar");
+  $("pending-email").textContent = currentUser?.email || "";
+}
+
+function showApp() {
+  hide("auth-screen");
+  hide("pending-screen");
+  show("user-bar");
+  show("history-section");
+  $("user-email").textContent = currentUser.email;
+  if (currentUser.photoURL) $("user-avatar").src = currentUser.photoURL;
+  else $("user-avatar").style.display = "none";
+  const badge = $("user-role-badge");
+  badge.textContent = currentUser.role === "admin" ? "Admin" : "Usuário";
+  badge.className = "role-badge " + currentUser.role;
+}
+
+function roleName(role) {
+  return role === "admin" ? "Admin" : role === "user" ? "Usuário" : "Pendente";
+}
+
+async function renderAdminPanel() {
+  const list = $("admin-users-list");
+  list.innerHTML = '<p class="history-empty">Carregando usuários...</p>';
+  try {
+    const snap = await getDocs(collection(fbDb, "users"));
+    const users = [];
+    snap.forEach(d => users.push(d.data()));
+    users.sort((a, b) => {
+      const order = { pending: 0, user: 1, admin: 2 };
+      const ra = order[a.role] ?? 99, rb = order[b.role] ?? 99;
+      if (ra !== rb) return ra - rb;
+      return (a.email || "").localeCompare(b.email || "");
+    });
+    if (users.length === 0) {
+      list.innerHTML = '<p class="history-empty">Nenhum usuário cadastrado ainda.</p>';
+      return;
+    }
+    list.innerHTML = "";
+    for (const u of users) list.appendChild(makeAdminRow(u));
+  } catch (err) {
+    list.innerHTML = `<p class="history-empty">Erro: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function makeAdminRow(u) {
+  const row = document.createElement("div");
+  row.className = "admin-user-row";
+
+  const img = document.createElement("img");
+  img.src = u.photoURL || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCI+PGNpcmNsZSBjeD0iMTQiIGN5PSIxNCIgcj0iMTQiIGZpbGw9IiNkMmQyZDciLz48L3N2Zz4=";
+  img.alt = "";
+  row.appendChild(img);
+
+  const info = document.createElement("div");
+  info.className = "info";
+  let dateStr = "";
+  try { if (u.createdAt) dateStr = new Date(u.createdAt).toLocaleDateString("pt-BR"); } catch {}
+  info.innerHTML = `
+    <div class="email">${escapeHtml(u.email || "")} <span class="role-pill ${u.role}">${roleName(u.role)}</span></div>
+    <div class="submeta">${escapeHtml(u.displayName || "")}${dateStr ? " • cadastro " + dateStr : ""}</div>
+  `;
+  row.appendChild(info);
+
+  const actions = document.createElement("div");
+  actions.className = "actions";
+
+  const isYou = u.uid === currentUser.uid;
+  const isHardcodedAdmin = u.email === ADMIN_EMAIL;
+
+  if (u.role === "pending") {
+    const approveBtn = document.createElement("button");
+    approveBtn.className = "btn";
+    approveBtn.textContent = "Aprovar";
+    approveBtn.addEventListener("click", async () => {
+      try {
+        await updateDoc(doc(fbDb, "users", u.uid), { role: "user", approvedAt: new Date().toISOString() });
+        renderAdminPanel();
+      } catch (err) { alert("Erro: " + err.message); }
+    });
+    actions.appendChild(approveBtn);
+    const denyBtn = document.createElement("button");
+    denyBtn.className = "btn danger";
+    denyBtn.textContent = "Recusar";
+    denyBtn.addEventListener("click", async () => {
+      if (!confirm(`Recusar e remover ${u.email}?`)) return;
+      try {
+        await deleteDoc(doc(fbDb, "users", u.uid));
+        renderAdminPanel();
+      } catch (err) { alert("Erro: " + err.message); }
+    });
+    actions.appendChild(denyBtn);
+  } else if (u.role === "user") {
+    const promoteBtn = document.createElement("button");
+    promoteBtn.className = "btn secondary";
+    promoteBtn.textContent = "Promover a admin";
+    promoteBtn.addEventListener("click", async () => {
+      if (!confirm(`Tornar ${u.email} administrador?`)) return;
+      try {
+        await updateDoc(doc(fbDb, "users", u.uid), { role: "admin" });
+        renderAdminPanel();
+      } catch (err) { alert("Erro: " + err.message); }
+    });
+    actions.appendChild(promoteBtn);
+    const revokeBtn = document.createElement("button");
+    revokeBtn.className = "btn danger";
+    revokeBtn.textContent = "Revogar acesso";
+    revokeBtn.addEventListener("click", async () => {
+      if (!confirm(`Revogar acesso de ${u.email}? (Volta para 'Pendente')`)) return;
+      try {
+        await updateDoc(doc(fbDb, "users", u.uid), { role: "pending" });
+        renderAdminPanel();
+      } catch (err) { alert("Erro: " + err.message); }
+    });
+    actions.appendChild(revokeBtn);
+  } else if (u.role === "admin" && !isHardcodedAdmin && !isYou) {
+    const demoteBtn = document.createElement("button");
+    demoteBtn.className = "btn secondary";
+    demoteBtn.textContent = "Rebaixar a usuário";
+    demoteBtn.addEventListener("click", async () => {
+      if (!confirm(`Rebaixar ${u.email} a usuário comum?`)) return;
+      try {
+        await updateDoc(doc(fbDb, "users", u.uid), { role: "user" });
+        renderAdminPanel();
+      } catch (err) { alert("Erro: " + err.message); }
+    });
+    actions.appendChild(demoteBtn);
+  }
+
+  if (isYou) {
+    const youBadge = document.createElement("span");
+    youBadge.className = "role-pill user";
+    youBadge.textContent = "Você";
+    actions.appendChild(youBadge);
+  }
+
+  row.appendChild(actions);
+  return row;
 }
 
 function genId() {
@@ -608,7 +1007,7 @@ function renderConfrontations(groups) {
     ta.rows = 4;
     ta.dataset.confLabel = label;
     ta.placeholder = sugestaoConector(label);
-    const stored = localStorage.getItem(memoryKey(label));
+    const stored = getConnectorMemory(label);
     if (stored) ta.value = stored;
     ta.addEventListener("input", refreshPreview);
     div.appendChild(ta);
@@ -802,11 +1201,10 @@ $("generate-btn").addEventListener("click", async () => {
     }
   }
 
-  // Salvar em localStorage (memória de conectores reusáveis)
-  for (const [label, txt] of Object.entries(map)) {
-    if (txt) localStorage.setItem(memoryKey(label), txt);
-    else localStorage.removeItem(memoryKey(label));
-  }
+  // Salvar memória de conectores reusáveis no Firestore (parallel)
+  await Promise.all(
+    Object.entries(map).map(([label, txt]) => setConnectorMemory(label, txt || null))
+  );
 
   const text = $("preview-text").value;
   const blob = await generateDocxBlob(text);
@@ -848,15 +1246,15 @@ $("generate-btn").addEventListener("click", async () => {
 });
 
 // ===== Pastas =====
-const EMPTY_FOLDERS_KEY = "emptyFolders";
 let currentFolderFilter = null; // null = todas; "" = sem pasta; "Nome" = pasta específica
 
 function getEmptyFolders() {
-  try { return JSON.parse(localStorage.getItem(EMPTY_FOLDERS_KEY) || "[]"); }
-  catch { return []; }
+  return Array.isArray(emptyFoldersCache) ? emptyFoldersCache : [];
 }
-function setEmptyFolders(arr) {
-  localStorage.setItem(EMPTY_FOLDERS_KEY, JSON.stringify(arr));
+async function setEmptyFolders(arr) {
+  emptyFoldersCache = arr;
+  try { await setDoc(metaRef("folders"), { empty: arr }); }
+  catch (err) { console.error("setEmptyFolders:", err); }
 }
 
 function allFolders(records) {
@@ -1111,11 +1509,13 @@ async function loadRecord(id) {
     recordId: rec.id
   };
   currentFilename = rec.filename || "";
-  // Reaplicar conectores no localStorage para que renderConfrontations preencha
+  // Reaplicar conectores no cache para que renderConfrontations preencha
   if (rec.conectores) {
-    for (const [label, txt] of Object.entries(rec.conectores)) {
-      if (txt) localStorage.setItem(memoryKey(label), txt);
-    }
+    await Promise.all(
+      Object.entries(rec.conectores)
+        .filter(([_, txt]) => txt)
+        .map(([label, txt]) => setConnectorMemory(label, txt))
+    );
   }
   renderHeader(parsedPdf.header);
   renderConfrontations(parsedPdf.groups);
@@ -1176,19 +1576,63 @@ $("clear-history-btn").addEventListener("click", async () => {
   await renderHistory();
 });
 
-// Inicialização — popular histórico ao abrir a página
-renderHistory();
-
-$("clear-memory-btn").addEventListener("click", () => {
-  if (!confirm("Apagar todas as confrontações salvas no navegador? (Os textos digitados em PDFs anteriores serão perdidos.)")) return;
-  const keys = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (k && k.startsWith("confrontante:")) keys.push(k);
+// ===== Bootstrap =====
+$("signin-btn").addEventListener("click", async () => {
+  try {
+    await signInWithPopup(fbAuth, googleProvider);
+  } catch (err) {
+    console.error("signIn:", err);
+    alert("Erro ao entrar: " + (err.message || err.code));
   }
-  keys.forEach(k => localStorage.removeItem(k));
-  $("action-info").textContent = `Memória limpa: ${keys.length} entrada(s) removida(s).`;
-  // Recarregar formulário do PDF atual (para limpar campos)
+});
+$("signout-btn").addEventListener("click", () => signOut(fbAuth));
+$("signout-pending-btn").addEventListener("click", () => signOut(fbAuth));
+
+onAuthStateChanged(fbAuth, async (user) => {
+  if (!user) {
+    currentUser = null;
+    currentUserDoc = null;
+    showAuthScreen();
+    return;
+  }
+  try {
+    const userDoc = await ensureUserDoc(user);
+    currentUser = {
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName,
+      photoURL: user.photoURL,
+      role: userDoc.role
+    };
+    currentUserDoc = userDoc;
+
+    if (userDoc.role === "pending") {
+      showPendingScreen();
+      return;
+    }
+
+    // Aprovado (user ou admin) — carrega caches e mostra o app
+    await loadUserCaches();
+    showApp();
+    if (userDoc.role === "admin") {
+      show("admin-section");
+      renderAdminPanel();
+    } else {
+      hide("admin-section");
+    }
+    await renderHistory();
+  } catch (err) {
+    console.error("auth flow:", err);
+    alert("Erro ao carregar perfil: " + (err.message || err.code));
+    showAuthScreen();
+  }
+});
+
+$("clear-memory-btn").addEventListener("click", async () => {
+  if (!confirm("Apagar todas as confrontações salvas? (Os textos digitados em PDFs anteriores serão perdidos.)")) return;
+  const before = connectorCache.size;
+  await clearConnectorMemory();
+  $("action-info").textContent = `Memória limpa: ${before} entrada(s) removida(s).`;
   if (parsedPdf) renderConfrontations(parsedPdf.groups);
   refreshPreview();
 });

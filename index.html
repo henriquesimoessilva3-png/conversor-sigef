@@ -1187,10 +1187,10 @@ function buildBodyText(parsed, conectores) {
       // Encontrar coordenadas do vértice de chegada (próximo segmento ou primeiro do próximo grupo)
       const next = nextRowAfter(parsed, gi, si);
       if (next) {
-        txt += ` ${s.azimute} e de ${s.dist}m até o vértice ${s.nextCode}, de coordenadas Longitude: ${next.lon}, Latitude: ${next.lat} e Altitude: ${next.alt} m;`;
+        txt += ` ${s.azimute} e ${s.dist}m até o vértice ${s.nextCode}, de coordenadas Longitude: ${next.lon}, Latitude: ${next.lat} e Altitude: ${next.alt} m;`;
       } else {
         // Última linha — vante volta ao vértice inicial. Só cita o código, sem repetir as coordenadas/altitude do início.
-        txt += ` ${s.azimute} e de ${s.dist}m até o vértice ${s.nextCode},`;
+        txt += ` ${s.azimute} e ${s.dist}m até o vértice ${s.nextCode},`;
       }
     }
   }

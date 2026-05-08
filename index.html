@@ -527,11 +527,15 @@
   </section>
 
   <section id="actions-section" class="hidden">
-    <h2>5. Gerar Word</h2>
+    <h2>5. Gerar arquivos</h2>
     <div class="actions">
       <button class="btn" id="generate-btn">Gerar e baixar .docx</button>
+      <button class="btn" id="kmz-btn">Gerar e baixar .kmz</button>
       <button class="btn danger" id="clear-memory-btn">Limpar memória de confrontações</button>
     </div>
+    <p style="margin-top:8px; font-size:12px; color:#666;">
+      O .kmz contém o polígono georreferenciado em SIRGAS 2000 — abre no Google Earth, QGIS, ArcGIS e na maioria das plataformas geo (incluindo a Plataforma Nacional do INCRA).
+    </p>
     <div class="info-box" id="action-info"></div>
   </section>
 
@@ -1172,7 +1176,7 @@ function buildBodyText(parsed, conectores) {
   if (groups.length === 0) return "";
 
   const firstSeg = groups[0].segments[0];
-  let txt = `Inicia-se a descrição deste perímetro no vértice ${firstSeg.vCode}, de coordenadas Long: ${firstSeg.lon} W, Lat: ${firstSeg.lat} S e Altitude: ${firstSeg.alt} m;`;
+  let txt = `Inicia-se a descrição deste perímetro no vértice ${firstSeg.vCode}, de coordenadas Longitude: ${firstSeg.lon}, Latitude: ${firstSeg.lat} e Altitude: ${firstSeg.alt} m;`;
 
   for (let gi = 0; gi < groups.length; gi++) {
     const g = groups[gi];
@@ -1183,10 +1187,10 @@ function buildBodyText(parsed, conectores) {
       // Encontrar coordenadas do vértice de chegada (próximo segmento ou primeiro do próximo grupo)
       const next = nextRowAfter(parsed, gi, si);
       if (next) {
-        txt += ` ${s.azimute} e de ${s.dist}m até o vértice ${s.nextCode}, de coordenadas Lon: ${next.lon} W, Lat: ${next.lat} S e Altitude: ${next.alt} m;`;
+        txt += ` ${s.azimute} e de ${s.dist}m até o vértice ${s.nextCode}, de coordenadas Longitude: ${next.lon}, Latitude: ${next.lat} e Altitude: ${next.alt} m;`;
       } else {
-        // Última linha — vante volta ao vértice inicial
-        txt += ` ${s.azimute} e de ${s.dist}m até o vértice ${s.nextCode}, de coordenadas Lon: ${firstSeg.lon} W, Lat: ${firstSeg.lat} S e Altitude: ${firstSeg.alt} m;`;
+        // Última linha — vante volta ao vértice inicial. Só cita o código, sem repetir as coordenadas/altitude do início.
+        txt += ` ${s.azimute} e de ${s.dist}m até o vértice ${s.nextCode},`;
       }
     }
   }
@@ -1319,6 +1323,153 @@ function suggestedFilename() {
   const mat = (parsedPdf.header.matricula || "").trim();
   return `${denom}${mat ? " - Mat " + mat : ""}.docx`;
 }
+
+function suggestedKmzFilename() {
+  if (!parsedPdf) return "memorial.kmz";
+  const denom = (parsedPdf.header.denominacao || "memorial").replace(/[\\\/:*?"<>|]/g, "");
+  const mat = (parsedPdf.header.matricula || "").trim();
+  return `${denom}${mat ? " - Mat " + mat : ""}.kmz`;
+}
+
+// Converte string DMS ("50°35'05,1234\"" ou "-50°35'05,1234\"") para graus decimais.
+// PDFs do SIGEF/INCRA quase sempre vêm sem sinal — Brasil é S/W, então valores são negativos.
+// Se vier sinal explícito, respeita.
+function dmsToDecimal(dms, hemisphere) {
+  if (!dms) return NaN;
+  const m = dms.match(/^(-?)(\d+)°(\d+)'(\d+(?:[,\.]\d+)?)"$/);
+  if (!m) return NaN;
+  const explicitSign = m[1] === "-" ? -1 : 1;
+  const deg = parseInt(m[2], 10);
+  const min = parseInt(m[3], 10);
+  const sec = parseFloat(m[4].replace(",", "."));
+  const decimal = deg + min / 60 + sec / 3600;
+  // hemisphere: 'S'/'W' = negativo; 'N'/'E' = positivo. Se sinal já explícito, prevalece.
+  if (m[1] === "-") return -decimal;
+  if (hemisphere === "S" || hemisphere === "W") return -decimal;
+  return explicitSign * decimal;
+}
+
+function escapeXml(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function buildKmlXml(parsed) {
+  const h = parsed.header || {};
+  const rows = parsed.rows || [];
+  const denom = h.denominacao || "Imóvel";
+  const matricula = h.matricula || "";
+  const proprietario = h.proprietario || "";
+  const area = h.area || "";
+  const perimetro = h.perimetro || "";
+
+  // Converte cada vértice para [lon, lat, alt] em decimal.
+  const points = rows.map(r => ({
+    code: r.vCode,
+    lon: dmsToDecimal(r.lon, "W"),
+    lat: dmsToDecimal(r.lat, "S"),
+    alt: parseFloat(String(r.alt).replace(",", ".")) || 0,
+    confront: r.confront || ""
+  })).filter(p => isFinite(p.lon) && isFinite(p.lat));
+
+  if (points.length < 3) {
+    throw new Error(`Só ${points.length} vértice(s) válido(s) — precisa de ao menos 3 para formar polígono.`);
+  }
+
+  // Coordenadas do polígono: lon,lat,alt separados por espaço/quebra. Fechar repetindo o 1º.
+  const coordPairs = points.map(p => `${p.lon.toFixed(8)},${p.lat.toFixed(8)},${p.alt.toFixed(2)}`);
+  coordPairs.push(coordPairs[0]);
+  const coordsStr = coordPairs.join("\n          ");
+
+  // Placemarks individuais para cada vértice (facilita identificar no Google Earth).
+  const vertexPlacemarks = points.map(p => `
+      <Placemark>
+        <name>${escapeXml(p.code)}</name>
+        <styleUrl>#vertice</styleUrl>
+        <Point><coordinates>${p.lon.toFixed(8)},${p.lat.toFixed(8)},${p.alt.toFixed(2)}</coordinates></Point>
+      </Placemark>`).join("");
+
+  const description = [
+    matricula    ? `<b>Matrícula:</b> ${escapeXml(matricula)}` : "",
+    proprietario ? `<b>Proprietário:</b> ${escapeXml(proprietario)}` : "",
+    area         ? `<b>Área:</b> ${escapeXml(area)}` : "",
+    perimetro    ? `<b>Perímetro:</b> ${escapeXml(perimetro)}` : "",
+    `<b>Vértices:</b> ${points.length}`,
+    `<i>Datum: SIRGAS 2000 (compatível com WGS84)</i>`
+  ].filter(Boolean).join("<br/>");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${escapeXml(denom)}${matricula ? " - Mat " + escapeXml(matricula) : ""}</name>
+    <description><![CDATA[${description}]]></description>
+    <Style id="poligono">
+      <LineStyle><color>ff0000ff</color><width>2</width></LineStyle>
+      <PolyStyle><color>4d00ffff</color><fill>1</fill><outline>1</outline></PolyStyle>
+    </Style>
+    <Style id="vertice">
+      <IconStyle>
+        <color>ff00ffff</color>
+        <scale>0.7</scale>
+        <Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon>
+      </IconStyle>
+      <LabelStyle><scale>0.7</scale></LabelStyle>
+    </Style>
+    <Placemark>
+      <name>${escapeXml(denom)}</name>
+      <description><![CDATA[${description}]]></description>
+      <styleUrl>#poligono</styleUrl>
+      <Polygon>
+        <tessellate>1</tessellate>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+          ${coordsStr}
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+    <Folder>
+      <name>Vértices (${points.length})</name>
+      <visibility>0</visibility>${vertexPlacemarks}
+    </Folder>
+  </Document>
+</kml>`;
+}
+
+async function generateKmzBlob(parsed) {
+  const kml = buildKmlXml(parsed);
+  const zip = new JSZip();
+  zip.file("doc.kml", kml);
+  return zip.generateAsync({type: "blob", mimeType: "application/vnd.google-earth.kmz"});
+}
+
+$("kmz-btn").addEventListener("click", async () => {
+  if (!parsedPdf) {
+    alert("Carregue um PDF primeiro.");
+    return;
+  }
+  try {
+    const blob = await generateKmzBlob(parsedPdf);
+    const filename = suggestedKmzFilename();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (err) {
+    console.error("Erro ao gerar KMZ:", err);
+    alert(`Erro ao gerar KMZ: ${err.message}`);
+  }
+});
 
 $("generate-btn").addEventListener("click", async () => {
   if (!parsedPdf) return;
